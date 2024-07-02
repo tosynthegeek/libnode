@@ -72,8 +72,12 @@ func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
     return nil
 }
 
-func RecieveData(node host.Host) {
+func RecieveData(node host.Host) chan string {
+	dataChan := make(chan string)
+    
 	node.Network().SetStreamHandler(func(s network.Stream) {
+		defer s.Close()
+
 		buf:= make([]byte, 1024)
 		n, err:= s.Read(buf)
 		if err != nil {
@@ -82,8 +86,10 @@ func RecieveData(node host.Host) {
 		}
 
 		data:= string(buf[:n])
-		log.Printf("Data received: %s\n", data)
+		log.Printf("Data received oo: %s\n", data)
 
-		s.Close()
+		dataChan <- data
 	})
+
+	return dataChan
 }

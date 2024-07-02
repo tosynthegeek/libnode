@@ -7,6 +7,7 @@ import (
 	"libp2p/nodes"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 )
@@ -84,25 +85,37 @@ func sendDataHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    fmt.Fprintf(w, "Datasent: %s\n", payload.Data)
+
     fmt.Fprintf(w, "Data sent successfully")
 }
 
 // Initialize node and receive data handler
 func initReceiveHandler(w http.ResponseWriter, r *http.Request) {
+    var receivedData string
+    var dataChan chan string
     if source == nil && target == nil {
         http.Error(w, "No node initialized", http.StatusBadRequest)
         return
     }
 
     if source != nil && target != nil{
-        nodes.RecieveData(source)
+        dataChan = nodes.RecieveData(source)
         fmt.Fprintf(w, "Source node and Target node are ready to receive data \n")
+
+        // Wait for data with a timeout
+        select {
+        case receivedData := <-dataChan:
+            fmt.Fprintf(w, "Data received: %s\n", receivedData)
+        case <-time.After(5 * time.Second):
+            fmt.Fprintf(w, "No data received within timeout period\n")
+        }
     }
 
+    fmt.Fprintf(w, "Data receieved: %s \n", receivedData)
 }
 
 func main() {
-
     http.HandleFunc("/createSourceNode", createSourceNode)
     http.HandleFunc("/createTargetNode", createTargetNode)
     http.HandleFunc("/connectNodes", connectNodes)
