@@ -58,7 +58,7 @@ func NodeID(node host.Host) {
 
 func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
 	targetId:= targetNode.ID()
-	stream, err:= sourceNode.NewStream(context.Background(), targetId, "/simulate")
+	stream, err:= sourceNode.Network().NewStream(context.Background(), targetId)
 	if err != nil {
 		return fmt.Errorf("failed to create new stream: %w", err)
 	}
@@ -73,7 +73,7 @@ func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
 }
 
 func RecieveData(node host.Host) {
-	node.SetStreamHandler("/simulate", func(s network.Stream) {
+	node.Network().SetStreamHandler(func(s network.Stream) {
 		buf:= make([]byte, 1024)
 		n, err:= s.Read(buf)
 		if err != nil {
@@ -82,7 +82,7 @@ func RecieveData(node host.Host) {
 		}
 
 		data:= string(buf[:n])
-		fmt.Printf("Data: %s\n", data)
+		log.Printf("Data received: %s\n", data)
 
 		s.Close()
 	})
