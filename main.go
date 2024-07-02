@@ -11,6 +11,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
 	nodes.NodeID(source)
 	nodes.NodeAddress(source)
 

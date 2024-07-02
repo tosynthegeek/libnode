@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
 func SourceNode() (host.Host, error) {
@@ -53,4 +54,36 @@ func NodeAddress(node host.Host) {
 
 func NodeID(node host.Host) {
 	fmt.Printf("Node ID: %s", node.ID().String())
+}
+
+func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
+	targetId:= targetNode.ID()
+	stream, err:= sourceNode.NewStream(context.Background(), targetId, "/simulate")
+	if err != nil {
+		return fmt.Errorf("failed to create new stream: %w", err)
+	}
+    defer stream.Close()
+
+    _, err = stream.Write([]byte(data))
+    if err != nil {
+        return fmt.Errorf("failed to write to stream: %w", err)
+    }
+
+    return nil
+}
+
+func RecieveData(node host.Host) {
+	node.SetStreamHandler("/simulate", func(s network.Stream) {
+		buf:= make([]byte, 1024)
+		n, err:= s.Read(buf)
+		if err != nil {
+			log.Printf("Error reading from stream: %s", err)
+            return
+		}
+
+		data:= string(buf[:n])
+		fmt.Printf("Data: %s\n", data)
+
+		s.Close()
+	})
 }
