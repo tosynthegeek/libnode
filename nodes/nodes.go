@@ -3,6 +3,7 @@ package nodes
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/libp2p/go-libp2p"
@@ -56,9 +57,9 @@ func NodeID(node host.Host) {
 	fmt.Printf("Node ID: %s", node.ID().String())
 }
 
-func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
-	targetId:= targetNode.ID()
-	stream, err:= sourceNode.Network().NewStream(context.Background(), targetId)
+func SendData(source host.Host, target host.Host, data string) error {
+	targetId:= target.ID()
+	stream, err:= source.Network().NewStream(context.Background(), targetId)
 	if err != nil {
 		return fmt.Errorf("failed to create new stream: %w", err)
 	}
@@ -72,24 +73,36 @@ func SendData(sourceNode host.Host, targetNode host.Host, data string) error {
     return nil
 }
 
-func RecieveData(node host.Host) chan string {
-	dataChan := make(chan string)
+func RecieveData(node host.Host) string {
+	dataChan := make(chan string, 10)
+	var data string
     
-	node.Network().SetStreamHandler(func(s network.Stream) {
-		defer s.Close()
+	node.Network().SetStreamHandler(func(stream network.Stream) {
+		defer stream.Close()
 
 		buf:= make([]byte, 1024)
-		n, err:= s.Read(buf)
-		if err != nil {
-			log.Printf("Error reading from stream: %s", err)
-            return
+		for {
+            n, err := stream.Read(buf)
+            if err != nil {
+                if err != io.EOF {
+                    log.Printf("Error reading from stream: %s", err)
+                }
+                close(dataChan) // Close channel when stream ends
+                break
+            }
+			
+			log.Println(n)
+			data:= string(buf[:n])
+			log.Printf("Data received oo: %s\n", data)
+
+			select {
+				case dataChan <- data:
+					log.Println("Data sent to channel")
+				default:
+					log.Println("Data channel full or closed")
+			}
 		}
-
-		data:= string(buf[:n])
-		log.Printf("Data received oo: %s\n", data)
-
-		dataChan <- data
 	})
 
-	return dataChan
+	return data
 }
