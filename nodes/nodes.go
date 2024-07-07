@@ -5,38 +5,100 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
+func Lnode() {
+	node, err:= libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+		libp2p.Ping(false),
+	)
+
+	if err != nil {
+        panic(err)
+    }
+
+    // configure our own ping protocol
+    pingService := &ping.PingService{Host: node}
+    node.SetStreamHandler(ping.ID, pingService.PingHandler)
+
+	peerInfo := peer.AddrInfo{
+        ID:    node.ID(),
+        Addrs: node.Addrs(),
+    }
+    addrs, err := peer.AddrInfoToP2pAddrs(&peerInfo)
+	if err != nil {
+		panic(err)
+	}
+    fmt.Println("libp2p node address:", addrs[0])
+}
+
 func SourceNode() (host.Host, error) {
-	node, err:= libp2p.New()
+	node, err:= libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+		libp2p.Ping(false),
+	)
+
+	fmt.Println("Node listenig on: ", node.Addrs())
 	if err != nil {
 		return nil, fmt.Errorf("error creating a new node %w", err)
 	}
+
+	// wait for a SIGINT or SIGTERM signal
+        ch := make(chan os.Signal, 1)
+        signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+        <-ch
+        fmt.Println("Received signal, shutting down...")
+
+        // shut the node down
+        if err := node.Close(); err != nil {
+                panic(err)
+        }
 
 	return node, nil
 }
 
 func TargetNode() (host.Host, error) {
-	node, err:= libp2p.New(libp2p.ListenAddrStrings(
-		"/ip4/0.0.0.0/tcp/8007",
-	))
+	node, err:= libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+		libp2p.Ping(false),
+	)
+
+	fmt.Println("Node listenig on: ", node.Addrs())
 	if err != nil {
 		return nil, fmt.Errorf("error creating a new node %w", err)
 	}
 
+	// wait for a SIGINT or SIGTERM signal
+        ch := make(chan os.Signal, 1)
+        signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+        <-ch
+        fmt.Println("Received signal, shutting down...")
+
+        // shut the node down
+        if err := node.Close(); err != nil {
+                panic(err)
+        }
+
 	return node, err
 }
 
-func ConnectNode(sourceNode host.Host, targetNode host.Host)  {
+func ConnectNode(sourceNode host.Host, targetNode host.Host) error {
 	targetNodeAddeInfo := host.InfoFromHost(targetNode)
 	err:= sourceNode.Connect(context.Background(), *targetNodeAddeInfo)
 	if err != nil {
-		log.Fatal(err.Error())
+		return fmt.Errorf("failed to connect nodes: %w", err)
 	}
+	log.Printf("Source node connected to target node: %s", targetNode.ID().String())
+	return nil
 }
 
 func SourceNodePeers(sourceNode host.Host) (int, error) {
